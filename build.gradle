@@ -1,6 +1,7 @@
 group = ARTIFACT_GROUP
 version = ARTIFACT_VERSION
 
+
 buildscript {
     repositories {
         google()
@@ -9,15 +10,37 @@ buildscript {
 
     dependencies {
         classpath 'com.android.tools.build:gradle:3.5.2'
+        classpath 'com.github.dcendents:android-maven-gradle-plugin:2.1'
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.+'
     }
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'maven'
-apply plugin: 'signing'
+apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'com.jfrog.bintray'
 
 ext {
-    artifactId = 'datadive-android-sdk'
+    bintrayRepo = POM_REPOSITORY_NAME
+    bintrayName = POM_PACKAGE_NAME
+
+    publishedGroupId = ARTIFACT_GROUP
+    libraryName = 'Datadive'
+    artifact = POM_PACKAGE_NAME
+
+    libraryDescription = POM_DESCRIPTION
+
+    siteUrl = POM_URL
+    gitUrl = POM_SCM_URL
+
+    libraryVersion = version
+
+    developerId = POM_DEVELOPER_ID
+    developerName = POM_DEVELOPER_NAME
+    developerEmail = POM_DEVELOPER_EMAIL
+
+    licenseName = POM_LICENCE_NAME
+    licenseUrl = POM_LICENCE_URL
+    allLicenses = [POM_LICENCE]
 }
 
 repositories {
@@ -90,151 +113,80 @@ dependencies {
 }
 
 // ======== For SDK Releases ========
-uploadArchives {
-    repositories.mavenDeployer {
-        beforeDeployment {
-            MavenDeployment deployment -> signing.signPom(deployment)
-        }
-
-        pom.groupId = ARTIFACT_GROUP
-        pom.version = ARTIFACT_VERSION
-
-        pom.project {
-            name project.name
-            version ARTIFACT_VERSION
-            packaging POM_PACKAGING
-            description POM_DESCRIPTION
-            url POM_URL
-
-            scm {
-                url POM_SCM_URL
-                connection POM_SCM_CONNECTION
-                developerConnection POM_SCM_DEV_CONNECTION
-            }
-
-            licenses {
-                license {
-                    name POM_LICENCE_NAME
-                    url POM_LICENCE_URL
-                    distribution POM_LICENCE_DIST
-                }
-            }
-            developers {
-                developer {
-                    id POM_DEVELOPER_ID
-                    name POM_DEVELOPER_NAME
-                    email POM_DEVELOPER_EMAIL
-                    organization POM_DEVELOPER_ORG
-                    organizationUrl POM_DEVELOPER_ORG_URL
-                }
-            }
-        }
-
-        pom.whenConfigured { pom ->
-            pom.dependencies*.optional = true
-        }
-
-        repository(url: RELEASE_REPOSITORY_URL) {
-            authentication(userName: getRepositoryUsername(), password: getRepositoryPassword())
-        }
-        snapshotRepository(url: SNAPSHOT_REPOSITORY_URL) {
-            authentication(userName: getRepositoryUsername(), password: getRepositoryPassword())
-        }
-    }
-}
-
-task install(type: Upload, dependsOn: assemble) {
+install {
     repositories.mavenInstaller {
-        configuration = configurations.archives
-
-        pom.groupId = ARTIFACT_GROUP
-        pom.version = ARTIFACT_VERSION
-
         pom.project {
-            name project.name
-            version ARTIFACT_VERSION
             packaging POM_PACKAGING
-            description POM_DESCRIPTION
-            url POM_URL
+            groupId publishedGroupId
+            artifactId artifact
 
-            scm {
-                url POM_SCM_URL
-                connection POM_SCM_CONNECTION
-                developerConnection POM_SCM_DEV_CONNECTION
-            }
+            name libraryName
+            description libraryDescription
+            url siteUrl
 
             licenses {
                 license {
-                    name POM_LICENCE_NAME
-                    url POM_LICENCE_URL
-                    distribution POM_LICENCE_DIST
+                    name licenseName
+                    url licenseUrl
                 }
             }
             developers {
                 developer {
-                    id POM_DEVELOPER_ID
-                    name POM_DEVELOPER_NAME
-                    email POM_DEVELOPER_EMAIL
-                    organization POM_DEVELOPER_ORG
-                    organizationUrl POM_DEVELOPER_ORG_URL
+                    id developerId
+                    name developerName
+                    email developerEmail
                 }
+            }
+            scm {
+                connection gitUrl
+                developerConnection gitUrl
+                url siteUrl
             }
         }
     }
 }
 
-//task androidJavadocs(type: Javadoc, dependsOn: ':generateReleaseBuildConfig') {
-//    source = android.sourceSets.main.java.srcDirs
-//    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
-//    classpath += project.files('build/generated/source/buildConfig/release')
-//
-//    exclude(
-//            '**/R.*',
-//            '**/security/**',
-//            '**/unity/**',
-//            '**/api/DatadiveLog.java',
-//            '**/api/Constants.java',
-//            '**/api/DeviceInfo.java',
-//            '**/api/Utils.java',
-//            '**/api/WorkerThread.java',
-//            '**/api/CursorWindowAllocationException.java'
-//    )
-//    options {
-//        encoding = 'UTF-8'
-//        docEncoding = 'UTF-8'
-//        charSet = 'UTF-8'
-//    }
-//    failOnError false
-//}
-//
-//task androidJavadocsJar(type: Jar, dependsOn: androidJavadocs) {
-//    classifier = 'javadoc'
-//    from androidJavadocs.destinationDir
-//}
-
-task androidSourcesJar(type: Jar) {
+task sourcesJar(type: Jar) {
     classifier = 'sources'
     from android.sourceSets.main.java.srcDirs
 }
 
-signing {
-    required { isReleaseBuild() && gradle.taskGraph.hasTask(":uploadArchives") }
-    sign configurations.archives
-}
+//task javadoc(type: Javadoc) {
+//    source = android.sourceSets.main.java.srcDirs
+//    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+//}
+//
+//task javadocJar(type: Jar, dependsOn: javadoc) {
+//    classifier = 'javadoc'
+//    from javadoc.destinationDir
+//}
 
 artifacts {
-    archives androidSourcesJar
-//    archives androidJavadocsJar
+//    archives javadocJar
+    archives sourcesJar
 }
 
-def isReleaseBuild() {
-    return version.contains("SNAPSHOT") == false
-}
+Properties properties = new Properties()
+properties.load(project.rootProject.file('local.properties').newDataInputStream())
 
-def getRepositoryUsername() {
-    return hasProperty('sonatypeUsername') ? sonatypeUsername : ""
-}
+bintray {
+    user = properties.getProperty("bintray.user")
+    key = properties.getProperty("bintray.apikey")
 
-def getRepositoryPassword() {
-    return hasProperty('sonatypePassword') ? sonatypePassword : ""
+    configurations = ['archives']
+    pkg {
+        repo = bintrayRepo
+        name = bintrayName
+        desc = libraryDescription
+        websiteUrl = siteUrl
+        vcsUrl = gitUrl
+        licenses = allLicenses
+        dryRun = false
+        publish = true
+        override = false
+        publicDownloadNumbers = true
+        version {
+            desc = libraryDescription
+        }
+    }
 }
